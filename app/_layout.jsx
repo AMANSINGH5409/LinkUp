@@ -6,7 +6,10 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { getUserData } from "../services/userService";
 
-LogBox.ignoreLogs(["Warning: TNodeChildrenRenderer:"]);
+LogBox.ignoreLogs([
+  "Warning: TNodeChildrenRenderer:",
+  "Warning: TNodeChildrenRenderer:",
+]);
 const _layout = () => {
   return (
     <AuthProvider>
@@ -48,7 +51,14 @@ const MainLayout = () => {
       screenOptions={{
         headerShown: false,
       }}
-    />
+    >
+      <Stack.Screen
+        name="(main)/postDetails"
+        options={{
+          presentation: "modal",
+        }}
+      />
+    </Stack>
   );
 };
 

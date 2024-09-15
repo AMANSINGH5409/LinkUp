@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 import Avatar from "../../components/Avatar";
 import { getUserImageSrc } from "../../services/imageService";
 import { fetchPosts } from "../../services/postService";
+import { getUserData } from "../../services/userService";
 import PostCard from "../../components/PostCard";
 import Loading from "../../components/Loading";
 
@@ -21,16 +22,40 @@ const Home = () => {
   const { user } = useAuth();
   const router = useRouter();
   const [posts, setPosts] = useState([]);
+  const [hasMore, setHasMore] = useState(true);
+
+  const handlePostEvent = async (payload) => {
+    if (payload.eventType == "INSERT" && payload?.new?.id) {
+      let newPost = { ...payload.new };
+      let res = await getUserData(newPost.userId);
+      newPost.user = res.success ? res.data : {};
+      setPosts((prevPost) => [newPost, ...prevPost]);
+    }
+  };
 
   useEffect(() => {
-    getPosts();
+    let postChannel = supabase
+      .channel("posts")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "posts" },
+        handlePostEvent
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(postChannel);
+    };
   }, []);
 
   const getPosts = async () => {
-    limit = limit + 10;
+    if (!hasMore) return null;
+
+    limit = limit + 4;
     const res = await fetchPosts(limit);
 
     if (res.success) {
+      if (posts.length == res.data.length) setHasMore(false);
       setPosts(res.data);
     }
   };
@@ -74,18 +99,28 @@ const Home = () => {
           data={posts}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listStyle}
+          onEndReached={() => {
+            getPosts();
+          }}
+          onEndReachedThreshold={0}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
             <PostCard item={item} currentUser={user} router={router} />
           )}
           ListFooterComponent={
-            <View
-              style={{
-                marginVertical: posts.length == 0 ? hp(50) - hp(15) : 30,
-              }}
-            >
-              <Loading />
-            </View>
+            hasMore ? (
+              <View
+                style={{
+                  marginVertical: posts.length == 0 ? hp(35) : 30,
+                }}
+              >
+                <Loading />
+              </View>
+            ) : (
+              <View style={{ marginVertical: 30 }}>
+                <Text style={styles.noPost}>No more posts</Text>
+              </View>
+            )
           }
         />
       </View>
@@ -98,6 +133,11 @@ export default Home;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  noPost: {
+    fontSize: hp(2),
+    textAlign: "center",
+    color: theme.colors.text,
   },
   header: {
     flexDirection: "row",
