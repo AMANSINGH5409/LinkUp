@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View, Text, LogBox } from "react-native";
 import React, { useEffect } from "react";
 import { Stack, useRouter } from "expo-router";
 import { supabase } from "../lib/supabase";
@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { getUserData } from "../services/userService";
 
+LogBox.ignoreLogs(["Warning: TNodeChildrenRenderer:"]);
 const _layout = () => {
   return (
     <AuthProvider>

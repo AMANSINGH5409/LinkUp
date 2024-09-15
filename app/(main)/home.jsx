@@ -1,7 +1,7 @@
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 import ScreenWrapper from "../../components/ScreenWrapper";
 import Button from "../../components/Button";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
 import { hp, wp } from "../../helpers/common";
@@ -12,10 +12,28 @@ import Icon from "../../assets/icons/index";
 import { useRouter } from "expo-router";
 import Avatar from "../../components/Avatar";
 import { getUserImageSrc } from "../../services/imageService";
+import { fetchPosts } from "../../services/postService";
+import PostCard from "../../components/PostCard";
+import Loading from "../../components/Loading";
 
+var limit = 0;
 const Home = () => {
   const { user } = useAuth();
   const router = useRouter();
+  const [posts, setPosts] = useState([]);
+
+  useEffect(() => {
+    getPosts();
+  }, []);
+
+  const getPosts = async () => {
+    limit = limit + 10;
+    const res = await fetchPosts(limit);
+
+    if (res.success) {
+      setPosts(res.data);
+    }
+  };
 
   return (
     <ScreenWrapper bg="white">
@@ -50,6 +68,26 @@ const Home = () => {
             </Pressable>
           </View>
         </View>
+
+        {/* Posts */}
+        <FlatList
+          data={posts}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listStyle}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <PostCard item={item} currentUser={user} router={router} />
+          )}
+          ListFooterComponent={
+            <View
+              style={{
+                marginVertical: posts.length == 0 ? hp(50) - hp(15) : 30,
+              }}
+            >
+              <Loading />
+            </View>
+          }
+        />
       </View>
     </ScreenWrapper>
   );
@@ -77,5 +115,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 20,
+  },
+  listStyle: {
+    paddingTop: 20,
+    paddingHorizontal: wp(4),
   },
 });
