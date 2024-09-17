@@ -1,5 +1,11 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React from "react";
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import React, { useState } from "react";
 import ScreenWrapper from "../../components/ScreenWrapper";
 import { useAuth } from "../../context/AuthContext";
 import { useRouter } from "expo-router";
@@ -12,10 +18,16 @@ import { supabase } from "../../lib/supabase";
 import Avatar from "../../components/Avatar";
 import { getUserImageSrc } from "../../services/imageService";
 import { Pressable } from "react-native";
+import { fetchPosts } from "../../services/postService";
+import PostCard from "../../components/PostCard";
+import Loading from "../../components/Loading";
 
+let limit = 0;
 const Profile = () => {
   const { user, setAuth } = useAuth();
   const router = useRouter();
+  const [posts, setPosts] = useState([]);
+  const [hasMore, setHasMore] = useState(true);
 
   const onLogout = async () => {
     setAuth(null);
@@ -40,9 +52,52 @@ const Profile = () => {
     ]);
   };
 
+  const getPosts = async () => {
+    if (!hasMore) return null;
+
+    limit = limit + 10;
+    const res = await fetchPosts(limit, user?.id);
+
+    if (res.success) {
+      if (posts.length == res.data.length) setHasMore(false);
+      setPosts(res.data);
+    }
+  };
+
   return (
     <ScreenWrapper bg="white">
-      <UserHeader user={user} router={router} handleLogout={handleLogout} />
+      <FlatList
+        data={posts}
+        ListHeaderComponent={
+          <UserHeader user={user} router={router} handleLogout={handleLogout} />
+        }
+        ListHeaderComponentStyle={{marginBottom: 30}}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listStyle}
+        onEndReached={() => {
+          getPosts();
+        }}
+        onEndReachedThreshold={0}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => (
+          <PostCard item={item} currentUser={user} router={router} />
+        )}
+        ListFooterComponent={
+          hasMore ? (
+            <View
+              style={{
+                marginVertical: posts.length == 0 ? hp(35) : 30,
+              }}
+            >
+              <Loading />
+            </View>
+          ) : (
+            <View style={{ marginVertical: 30 }}>
+              <Text style={styles.noPost}>No more posts</Text>
+            </View>
+          )
+        }
+      />
     </ScreenWrapper>
   );
 };

@@ -23,13 +23,46 @@ const Home = () => {
   const router = useRouter();
   const [posts, setPosts] = useState([]);
   const [hasMore, setHasMore] = useState(true);
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  const handleNotificationEvent = async (payload) => {
+    if (payload.eventType == "INSERT" && payload?.new?.id) {
+      setNotificationCount((prev) => prev + 1);
+    }
+  };
 
   const handlePostEvent = async (payload) => {
     if (payload.eventType == "INSERT" && payload?.new?.id) {
       let newPost = { ...payload.new };
       let res = await getUserData(newPost.userId);
       newPost.user = res.success ? res.data : {};
+      newPost.postLikes = [];
+      newPost.comments = [{ count: 0 }];
       setPosts((prevPost) => [newPost, ...prevPost]);
+    }
+
+    if (payload.eventType == "DELETE" && payload?.old?.id) {
+      setPosts((prevPost) => {
+        let updatedPosts = prevPost.filter(
+          (post) => post.id != payload?.old?.id
+        );
+        return updatedPosts;
+      });
+    }
+
+    if (payload.eventType == "UPDATE" && payload?.new?.id) {
+      setPosts((prevPost) => {
+        let updatedPosts = prevPost.map((post) => {
+          if (post?.id == payload?.new?.id) {
+            post.body = payload?.new?.body;
+            post.file = payload?.new?.file;
+          }
+
+          return post;
+        });
+
+        return updatedPosts;
+      });
     }
   };
 
@@ -43,15 +76,30 @@ const Home = () => {
       )
       .subscribe();
 
+    let notificationChannel = supabase
+      .channel("notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `receiverId=eq.${user?.id}`,
+        },
+        handleNotificationEvent
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(postChannel);
+      supabase.removeChannel(notificationChannel);
     };
   }, []);
 
   const getPosts = async () => {
     if (!hasMore) return null;
 
-    limit = limit + 4;
+    limit = limit + 10;
     const res = await fetchPosts(limit);
 
     if (res.success) {
@@ -67,13 +115,23 @@ const Home = () => {
         <View style={styles.header}>
           <Text style={styles.title}>LinkUp</Text>
           <View style={styles.icons}>
-            <Pressable onPress={() => router.push("notifictions")}>
+            <Pressable
+              onPress={() => {
+                setNotificationCount(0);
+                router.push("notifications");
+              }}
+            >
               <Icon
                 name="heart"
                 size={hp(3.2)}
                 strokeWidth={2}
                 color={theme.colors.text}
               />
+              {notificationCount > 0 && (
+                <View style={styles.pill}>
+                  <Text style={styles.pillText}>{notificationCount}</Text>
+                </View>
+              )}
             </Pressable>
             <Pressable onPress={() => router.push("newPost")}>
               <Icon
@@ -159,5 +217,21 @@ const styles = StyleSheet.create({
   listStyle: {
     paddingTop: 20,
     paddingHorizontal: wp(4),
+  },
+  pill: {
+    position: "absolute",
+    right: -10,
+    top: -4,
+    height: hp(2.2),
+    width: hp(2.2),
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 28,
+    backgroundColor: theme.colors.roseLight,
+  },
+  pillText: {
+    color: "white",
+    fontSize: hp(1.2),
+    fontWeight: theme.fonts.bold,
   },
 });
